@@ -131,5 +131,8 @@
     "react": "^16.9.0",
     "react-dom": "^16.9.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@types/use-set-interval": "^1.0.0",
+    "use-set-interval": "^1.0.0"
+  }
 }

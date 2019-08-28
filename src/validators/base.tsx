@@ -7,7 +7,7 @@ export type BooleanValidtorFN = (value: boolean) => SyncOrAsync<void>;
 export type StringValidtorFN = (value: string) => SyncOrAsync<void>;
 
 export type ValidatorFN<INPUT_TYPE extends InputType> = (
-  val: InputValueType<INPUT_TYPE>
+  val: InputValueType[INPUT_TYPE]
 ) => SyncOrAsync<void>;
 
 // export type ValidatorFN<VALUE extends number | string | boolean> = VALUE extends number

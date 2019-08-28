@@ -1,4 +1,4 @@
-import { createRef, RefObject, useMemo, useEffect } from "react";
+import { createRef, RefObject, useMemo, useEffect, useState, useCallback } from "react";
 import { noop, SyncOrAsync, usePrevious } from "../../utils";
 import { ValidatorFN } from "../../validators";
 import { InputType } from "./InputType";
@@ -16,6 +16,21 @@ export type InputValueType = {
   [InputType.Checkbox]: boolean;
 
   [InputType.Default]: string;
+};
+
+const fixInputValueType = <INPUT_TYPE extends InputType>(
+  value: string,
+  type: INPUT_TYPE
+): InputValueType[INPUT_TYPE] => {
+  if (type === InputType.Checkbox) {
+    return Boolean(value) as any;
+  }
+
+  if (type === InputType.Number) {
+    return Number(value) as any;
+  }
+
+  return String(value) as any;
 };
 
 export interface IInputOptions<INPUT_NAME extends string, INPUT_TYPE extends InputType> {
@@ -63,6 +78,15 @@ const defaultOptions = Object.freeze({
   validateInputOnBlur: true
 });
 
+// type InputsState<INPUT_NAME extends string, INPUT_TYPE extends InputType> = {
+//   [key in INPUT_NAME]: IInputState<INPUT_NAME, INPUT_TYPE>;
+// };
+
+type InputsState<INPUT_NAME extends string, INPUT_TYPE extends InputType> = IInputState<
+  INPUT_NAME,
+  INPUT_TYPE
+>[];
+
 export const useForm = <
   INPUT_NAME extends string,
   INPUT_TYPE extends InputType,
@@ -74,28 +98,6 @@ export const useForm = <
 
   const currentInputNames = options.inputs.map(item => item.name);
   const previousInputNames = usePrevious(currentInputNames);
-
-  const inputNameToDOMRefMap = useMemo(() => new Map<string, RefObject<HTMLInputElement>>(), []);
-  const domRefToInputState = useMemo(
-    () => new WeakMap<HTMLInputElement, IInputState<INPUT_NAME, INPUT_TYPE>>(),
-    []
-  );
-
-  const getInputElementRef = (name: INPUT_NAME): RefObject<HTMLInputElement> => {
-    if (!inputNameToDOMRefMap.has(name)) {
-      inputNameToDOMRefMap.set(name, createRef<HTMLInputElement>());
-    }
-
-    return inputNameToDOMRefMap.get(name)!;
-  };
-
-  const getInputState = (el: HTMLInputElement): IInputState<INPUT_NAME, INPUT_TYPE> | null => {
-    if (!domRefToInputState.has(el)) {
-      return null;
-    }
-
-    return domRefToInputState.get(el)!;
-  };
 
   const getInputOptions = (name: INPUT_NAME): IInputOptions<INPUT_NAME, INPUT_TYPE> => {
     const thisInputOptions = options.inputs.find(item => item.name === name);
@@ -114,115 +116,161 @@ export const useForm = <
       error: null,
       name,
       type: thisInputOptions.type,
-      value: thisInputOptions.defaultValue
+      value:
+        typeof thisInputOptions.defaultValue !== "undefined"
+          ? thisInputOptions.format
+            ? thisInputOptions.format(thisInputOptions.defaultValue)
+            : thisInputOptions.defaultValue
+          : thisInputOptions.defaultValue
     };
   };
 
-  useEffect(() => {
-    // Not omptimal but should work...
+  const [state, setState] = useState<InputsState<INPUT_NAME, INPUT_TYPE>>(() => {
+    return options.inputs.map(option => {
+      const inputState: IInputState<INPUT_NAME, INPUT_TYPE> = createState(option.name);
 
-    for (const currentInputName of currentInputNames) {
-      const ref = inputNameToDOMRefMap.get(currentInputName);
-
-      if (!ref || !ref.current) {
-        continue;
-      }
-
-      const previousState = domRefToInputState.get(ref.current);
-
-      const thisInputOptions = getInputOptions(currentInputName);
-
-      domRefToInputState.set(ref.current, {
-        error: previousState ? previousState.error : null,
-        name: currentInputName,
-        type: thisInputOptions.type,
-        value: previousState ? previousState.value : thisInputOptions.defaultValue
-      });
-    }
-
-    if (!previousInputNames) {
-      return;
-    }
-    // Free state of removed inputs...
-
-    for (let oldInputName of previousInputNames) {
-      if (!currentInputNames.includes(oldInputName)) {
-        inputNameToDOMRefMap.delete(oldInputName);
-      }
-    }
+      return inputState;
+    });
   });
+
+  const updateSingleInputState = useCallback(
+    (name: INPUT_NAME, newInputState: IInputState<INPUT_NAME, INPUT_TYPE>): void => {
+      const newState = [...state];
+      const index = newState.findIndex(item => item.name === name);
+
+      newState[index] = newInputState;
+
+      setState(newState);
+    },
+    [state]
+  );
+
+  const inputNameToDOMRefMap = useMemo(
+    () => new Map<INPUT_NAME, RefObject<HTMLInputElement>>(),
+    []
+  );
+
+  const getInputElementRef = useCallback(
+    (name: INPUT_NAME): RefObject<HTMLInputElement> => {
+      if (!inputNameToDOMRefMap.has(name)) {
+        inputNameToDOMRefMap.set(name, createRef<HTMLInputElement>());
+      }
+
+      return inputNameToDOMRefMap.get(name)!;
+    },
+    [inputNameToDOMRefMap]
+  );
+
+  useEffect(() => {
+    // @TODO: remove removed inputs and create states for new ones...
+  });
+
+  useEffect(() => {
+    for (let inputState of state) {
+      const ref = getInputElementRef(inputState.name);
+
+      if (ref.current && typeof inputState.value !== "undefined") {
+        if (inputState.type === InputType.Checkbox) {
+          ref.current.checked = inputState.value as boolean;
+        } else {
+          ref.current.value = String(inputState.value);
+        }
+      }
+    }
+  }, state);
+
+  const eventListenerHandler = useCallback(
+    (previousState: IInputState<INPUT_NAME, INPUT_TYPE>, event: Event): void => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+
+      const thisInputOptions = getInputOptions(previousState.name);
+      const valueWithFixedType = fixInputValueType(event.target.value, previousState.type);
+
+      if (event.type === "input") {
+        const newValue = thisInputOptions.format
+          ? thisInputOptions.format(valueWithFixedType)
+          : valueWithFixedType;
+
+        updateSingleInputState(previousState.name, {
+          ...previousState,
+          value: newValue
+        });
+
+        return;
+      }
+
+      if (event.type === "change") {
+        const newValue = event.target.checked as InputValueType[INPUT_TYPE];
+
+        updateSingleInputState(previousState.name, {
+          ...previousState,
+          value: newValue
+        });
+        return;
+      }
+
+      if (event.type === "blur") {
+        console.log("VALIDATE?!");
+        return;
+      }
+    },
+    [state]
+  );
 
   useEffect(() => {
     const removeListenerFNs: RemoveListenerFN[] = [];
 
-    inputNameToDOMRefMap.forEach(item => {
-      const ref = item.current;
+    for (let inputState of state) {
+      const ref = getInputElementRef(inputState.name);
 
-      if (!ref) {
-        return;
+      if (!ref.current) {
+        continue;
       }
 
-      const state = getInputState(ref);
-
-      if (!state) {
-        throw new Error("Shouldnt happen");
+      // Sync state with dom
+      if (ref.current.type !== inputState.type) {
+        ref.current.type = inputState.type;
       }
 
-      if (typeof state.value !== "undefined") {
-        ref.value = String(state.value);
+      // Add listeners
+      if (ref.current.type === InputType.Text || ref.current.type === InputType.Number) {
+        removeListenerFNs.push(
+          addEventListener(ref.current, "input", e => eventListenerHandler(inputState, e))
+        );
+      } else if (ref.current.type === InputType.Checkbox) {
+        removeListenerFNs.push(
+          addEventListener(ref.current, "change", e => eventListenerHandler(inputState, e))
+        );
       }
-
-      // @TODO: here add handler onChange for checkboxes?
 
       removeListenerFNs.push(
-        addEventListener(ref, "input", (e: Event): void => {
-          if (e.target instanceof HTMLInputElement) {
-            console.log(e.target.value);
-          }
-        })
+        addEventListener(ref.current, "blur", e => eventListenerHandler(inputState, e))
       );
-
-      removeListenerFNs.push(
-        addEventListener(ref, "blur", (e: Event): void => {
-          if (e.target instanceof HTMLInputElement) {
-            console.log("VALIDATION?");
-          }
-        })
-      );
-    });
+    }
 
     return () => removeListenerFNs.forEach(remove => remove());
-  });
+  }, [state]);
 
-  // @TODO: push error from onSubmit to this array?
-  const errors = options.inputs
-    .map(({ name }) => getInputElementRef(name))
-    .filter(ref => ref.current)
-    .map(ref => domRefToInputState.get(ref.current!))
-    .filter(state => !!state)
-    .map(state => state!.error);
+  const errors = state.map(item => item.error).filter(err => err);
+
+  console.log("returning new result");
 
   return {
     handleSubmit: () => {
       //
     },
-    inputs: options.inputs.reduce(
+    inputs: state.reduce(
       (previous, current) => {
-        const inputElementRef = getInputElementRef(current.name);
-        let inputState = inputElementRef.current ? getInputState(inputElementRef.current) : null;
-
-        if (!inputState) {
-          inputState = createState(current.name);
-        }
-
-        const inputData: IInputData<INPUT_NAME, INPUT_TYPE> = {
-          ref: inputElementRef,
-          ...inputState
-        };
+        const inputElementRef = getInputElementRef(current.name) as any;
 
         return {
           ...previous,
-          [current.name]: inputData
+          [current.name]: {
+            ref: inputElementRef,
+            ...current
+          }
         };
       },
       {} as U
