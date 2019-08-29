@@ -8,7 +8,6 @@ const Sample = () => {
   const form = useForm({
     inputs: {
       sampleInput: {
-        // name: "sampleInput",
         type: InputType.Text,
         format: val => {
           return val.replace(/\O|o/, "0");
@@ -16,17 +15,14 @@ const Sample = () => {
         defaultValue: "ajajaj"
       },
       sampleCheckbox: {
-        // name: "sampleCheckbox",
         type: InputType.Checkbox,
         defaultValue: true
       },
       sampleNumeric: {
-        // name: "sampleNumeric",
         type: InputType.Number,
         defaultValue: 666
       },
       sampleInput2: {
-        // name: "sampleInput2",
         type: InputType.Text,
         format: val => {
           return val.toUpperCase();
@@ -38,9 +34,9 @@ const Sample = () => {
 
   const [counter, setCounter] = React.useState<number>(0);
 
-  // useSetInterval(() => {
-  //   setCounter(counter + 1);
-  // }, 100);
+  useSetInterval(() => {
+    setCounter(counter + 1);
+  }, 100);
 
   return (
     <div>
