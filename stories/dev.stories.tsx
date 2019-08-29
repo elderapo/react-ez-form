@@ -6,34 +6,34 @@ import useSetInterval from "use-set-interval";
 
 const Sample = () => {
   const form = useForm({
-    inputs: [
-      {
-        name: "sampleInput",
+    inputs: {
+      sampleInput: {
+        // name: "sampleInput",
         type: InputType.Text,
         format: val => {
           return val.replace(/\O|o/, "0");
         },
         defaultValue: "ajajaj"
       },
-      {
-        name: "sampleCheckbox",
+      sampleCheckbox: {
+        // name: "sampleCheckbox",
         type: InputType.Checkbox,
         defaultValue: true
       },
-      {
-        name: "sampleNumeric",
+      sampleNumeric: {
+        // name: "sampleNumeric",
         type: InputType.Number,
         defaultValue: 666
       },
-      {
-        name: "sampleInput2",
+      sampleInput2: {
+        // name: "sampleInput2",
         type: InputType.Text,
         format: val => {
           return val.toUpperCase();
         },
         defaultValue: "ajajaj"
       }
-    ]
+    }
   });
 
   const [counter, setCounter] = React.useState<number>(0);
