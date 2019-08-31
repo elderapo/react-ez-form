@@ -1,7 +1,7 @@
 import { withInfo } from "@storybook/addon-info";
 import { storiesOf } from "@storybook/react";
 import * as React from "react";
-import { useForm, InputType } from "../src";
+import { useForm, InputType, useInputValue } from "../src";
 import useSetInterval from "use-set-interval";
 
 const Sample = () => {
@@ -16,7 +16,7 @@ const Sample = () => {
       },
       sampleCheckbox: {
         type: InputType.Checkbox,
-        defaultValue: true
+        defaultValue: false
       },
       sampleNumeric: {
         type: InputType.Number,
@@ -33,14 +33,18 @@ const Sample = () => {
   });
 
   const [counter, setCounter] = React.useState<number>(0);
+  // useSetInterval(() => {
+  //   setCounter(counter + 1);
+  // }, 100);
 
-  useSetInterval(() => {
-    setCounter(counter + 1);
-  }, 100);
+  const [isToggled, setIsToggled] = React.useState(false);
+
+  // const sampleCheckboxInputValue = useInputValue(form.inputs.sampleCheckbox.ref);
 
   return (
     <div>
       <span>counter: {counter}</span>
+      <button onClick={() => setIsToggled(!isToggled)}>toggle</button>
       <form
         onSubmit={form.handleSubmit}
         style={{
@@ -51,8 +55,10 @@ const Sample = () => {
       >
         <input ref={form.inputs.sampleInput.ref} />
         <input ref={form.inputs.sampleCheckbox.ref} />
-        <input ref={form.inputs.sampleNumeric.ref} />
-        <input ref={form.inputs.sampleInput2.ref} />
+        <input ref={form.inputs.sampleNumeric.ref} disabled />
+
+        {isToggled && <input ref={form.inputs.sampleInput2.ref} />}
+        {/* <input ref={form.inputs.sampleInput2.ref} /> */}
 
         <button>submit yo</button>
       </form>
