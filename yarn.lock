@@ -962,6 +962,11 @@
   dependencies:
     find-up "^2.1.0"
 
+"@elderapo/typed-event-emitter@^1.5.1":
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/@elderapo/typed-event-emitter/-/typed-event-emitter-1.5.1.tgz#63e2b406e9e1dd39950402618fafe194e779e660"
+  integrity sha512-jQ1GfrrPmLKlWCd+FfqzaFZ4jErgvnFghu0Oc3QHygmt9LeXZDvq0tbI/2PKlx+NXQJ/tjDUMrj54K+7KXOTEw==
+
 "@emotion/babel-utils@^0.6.4":
   version "0.6.10"
   resolved "https://registry.yarnpkg.com/@emotion/babel-utils/-/babel-utils-0.6.10.tgz#83dbf3dfa933fae9fc566e54fbb45f14674c6ccc"

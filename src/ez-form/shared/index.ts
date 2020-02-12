@@ -1,2 +1,2 @@
-export * from "./EzFormTypedInputRefObject";
+export * from "./EzFormTypedInputRefFN";
 export * from "./InputType";

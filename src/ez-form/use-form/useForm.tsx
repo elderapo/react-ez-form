@@ -1,27 +1,18 @@
-import {
-  createRef,
-  RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useLayoutEffect,
-  Ref,
-  MutableRefObject,
-  useRef
-} from "react";
+import { RefObject, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   addEventListener,
   noop,
   RemoveListenerFN,
   SyncOrAsync,
-  useStatefulRef,
-  useDOMNodeManager
+  useDOMNodeManager,
+  useDOMRef,
+  IUseDOMRefHookResult,
+  useDOMRefShared
 } from "../../utils";
 import { ValidatorFN } from "../../validators";
-import { EzFormTypedInputRefObject, InputType, InputValue } from "../shared";
+import { EzFormTypedInputRefFN, InputType, InputValue } from "../shared";
+import { parseInputValue, getInputValue, setInputValue } from "../use-input-value";
 import { EzFormUnexpectedError } from "./errors";
-import { fixInputValue } from "../use-input-value";
 
 export type InputConfig<
   INPUT_TYPE extends InputType,
@@ -58,7 +49,7 @@ export interface IUseFormHookOptions<INPUT_CONFIGS extends InputConfigs> {
 
 export interface InputResult<INPUT_VALUE extends InputValue<InputType>>
   extends Readonly<{
-    ref: EzFormTypedInputRefObject<INPUT_VALUE>;
+    ref: EzFormTypedInputRefFN<INPUT_VALUE>;
     // value?: Readonly<INPUT_TYPE>;
     error?: React.ReactNode;
   }> {}
@@ -113,7 +104,7 @@ export const useForm = <INPUT_CONFIGS extends InputConfigs>(
       const { format, type } = getInputOptions(inputName);
 
       if (format) {
-        return format(fixInputValue(value, type) as never) as INPUT_VALUE;
+        return format(parseInputValue(value, type) as never) as INPUT_VALUE;
       }
 
       return value;
@@ -121,80 +112,62 @@ export const useForm = <INPUT_CONFIGS extends InputConfigs>(
     [getInputOptions]
   );
 
-  // const domNodeRefs = useRef(
-  //   inputNames.reduce(
-  //     (previous, current) => {
-  //       return {
-  //         ...previous,
-  //         [current]: undefined
-  //       };
-  //     },
-  //     {} as Record<string, HTMLInputElement | undefined>
-  //   )
-  // );
+  const domRefsMap = inputNames.reduce(
+    (previous, current) => {
+      return {
+        ...previous,
+        [current]: useDOMRefShared<HTMLInputElement>()
+      };
+    },
+    {} as Record<string, IUseDOMRefHookResult<HTMLInputElement>>
+  );
 
-  const { getNode, createRef } = useDOMNodeManager({
-    onRefChange: (inputName, newNode) => {
-      console.log("onRefChange", inputName, newNode);
-      const domNode = getInputDOMNode(inputName);
+  // Thanks to this in case of input temporary input removal previous value of input will be used instead of defaultValue.
+  const cachedValues = useRef<Map<string, InputValue<InputType> | null>>(new Map());
 
-      if (!domNode) {
+  inputNames.forEach(inputName => {
+    useEffect(() => {
+      const domRef = domRefsMap[inputName].domRef;
+
+      if (!domRef) {
         return;
       }
 
       const inputOptions = getInputOptions(inputName);
-      updateInputDOMNodeValue(domNode, inputOptions.defaultValue);
+      setInputValue(
+        domRef,
+        formatInputValue(
+          inputName,
+          cachedValues.current.has(inputName)
+            ? cachedValues.current.get(inputName)
+            : inputOptions.defaultValue
+        )
+      );
 
-      if (domNode.type !== inputOptions.type) {
-        domNode.type = inputOptions.type;
+      if (domRef.type !== inputOptions.type) {
+        domRef.type = inputOptions.type;
       }
 
       const removeListenerFNs: RemoveListenerFN[] = [];
 
       removeListenerFNs.push(
-        addEventListener(domNode, "input", e => eventListenerHandler(inputName, e))
+        addEventListener(domRef, "input", e => eventListenerHandler(inputName, e))
       );
 
       removeListenerFNs.push(
-        addEventListener(domNode, "blur", e => eventListenerHandler(inputName, e))
+        addEventListener(domRef, "change", e => eventListenerHandler(inputName, e))
       );
 
-      return () => removeListenerFNs.forEach(remove => remove());
-    }
+      removeListenerFNs.push(
+        addEventListener(domRef, "blur", e => eventListenerHandler(inputName, e))
+      );
+
+      return () => {
+        cachedValues.current.set(inputName, getInputValue(domRef));
+        removeListenerFNs.forEach(remove => remove());
+      };
+    }, [domRefsMap[inputName].domRef, formatInputValue]);
   });
-
-  const getInputDOMNode = (name: string): HTMLInputElement => {
-    return getNode(name) as HTMLInputElement;
-  };
-
-  const getInputDOMNodeValue = useCallback((node: HTMLInputElement):
-    | InputValue<InputType>
-    | undefined => {
-    if (node.type === InputType.Checkbox) {
-      return Boolean(node.value);
-    }
-
-    return String(node.value);
-  }, []);
-
-  const updateInputDOMNodeValue = useCallback(
-    (node: HTMLInputElement, newValue: InputValue<InputType> | undefined): void => {
-      if (typeof newValue === "undefined") {
-        return;
-      }
-
-      if (typeof newValue === "boolean") {
-        if (node.checked !== newValue) {
-          node.checked = newValue;
-        }
-      } else {
-        if (node.value !== newValue) {
-          node.value = String(newValue);
-        }
-      }
-    },
-    []
-  );
 
   const eventListenerHandler = useCallback(
     (inputName: string, event: Event): void => {
@@ -202,24 +175,18 @@ export const useForm = <INPUT_CONFIGS extends InputConfigs>(
         return;
       }
 
-      const targetType = event.target.type === "checkbox" ? "checked" : "value";
-      const unformattedValue = event.target[targetType];
+      const unformattedValue = getInputValue(event.target);
       const formattedValue = formatInputValue(inputName, unformattedValue);
 
-      if (event.type === "input") {
-        updateInputDOMNodeValue(event.target, formattedValue);
-        // setState(state => ({ ...state }));
+      if (event.type === "input" || event.type === "change") {
+        console.log("Intercepting input...");
+        setInputValue(event.target, formattedValue);
 
         return;
       }
 
       if (event.type === "blur") {
-        console.log("VALIDATE?!");
-
-        // // commit
-        // updateSingleInputState(inputName, {
-        //   value: formattedValue
-        // });
+        console.log("Validation...");
 
         return;
       }
@@ -238,7 +205,7 @@ export const useForm = <INPUT_CONFIGS extends InputConfigs>(
         return {
           ...previous,
           [current]: {
-            ref: createRef(current),
+            ref: domRefsMap[current].setDomRef,
             error: null // tmp
           }
         };

@@ -1,6 +1,9 @@
-import { InputType, InputValue, EzFormTypedInputRefObject } from "../shared";
+import { InputType, InputValue } from "../shared";
 
-export const fixInputValue = <INPUT_TYPE extends InputType>(inputValue: any, type: INPUT_TYPE) => {
+export const parseInputValue = <INPUT_TYPE extends InputType>(
+  inputValue: any,
+  type: INPUT_TYPE
+) => {
   if (type === InputType.Checkbox) {
     return Boolean(inputValue);
   }
@@ -12,13 +15,25 @@ export const fixInputValue = <INPUT_TYPE extends InputType>(inputValue: any, typ
   return String(inputValue);
 };
 
-export const getInputValue = <INPUT_VALUE extends InputValue<InputType>>(
-  ref: EzFormTypedInputRefObject<INPUT_VALUE>
-): INPUT_VALUE | undefined => {
-  if (!ref.current) {
-    return undefined;
-  }
+export const getInputValueKey = <INPUT_TYPE extends InputType>(
+  type: INPUT_TYPE
+): "checked" | "value" => {
+  return type === InputType.Checkbox ? "checked" : "value";
+};
 
-  return fixInputValue(ref.current[ref.current.type === "checkbox" ? "checked" : "value"], ref
-    .current.type as InputType) as INPUT_VALUE;
+export const getInputValue = <INPUT_VALUE extends InputValue<InputType>>(
+  domNode: HTMLInputElement
+): INPUT_VALUE | null => {
+  const valueKey = getInputValueKey(domNode.type as InputType);
+
+  return (domNode[valueKey] as INPUT_VALUE) || null;
+};
+
+export const setInputValue = <INPUT_VALUE extends InputValue<InputType>>(
+  domNode: HTMLInputElement,
+  value: INPUT_VALUE
+): void => {
+  const valueKey = getInputValueKey(domNode.type as InputType);
+
+  (domNode as any)[valueKey] = value;
 };

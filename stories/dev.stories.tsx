@@ -37,14 +37,16 @@ const Sample = () => {
   //   setCounter(counter + 1);
   // }, 100);
 
-  const [isToggled, setIsToggled] = React.useState(false);
+  // const [isToggled, setIsToggled] = React.useState(false);
 
-  // const sampleCheckboxInputValue = useInputValue(form.inputs.sampleCheckbox.ref);
+  const sampleCheckboxInputValue = useInputValue(form.inputs.sampleCheckbox.ref);
+
+  console.log("render");
 
   return (
     <div>
       <span>counter: {counter}</span>
-      <button onClick={() => setIsToggled(!isToggled)}>toggle</button>
+      {/* <button onClick={() => setIsToggled(!isToggled)}>toggle</button> */}
       <form
         onSubmit={form.handleSubmit}
         style={{
@@ -57,7 +59,8 @@ const Sample = () => {
         <input ref={form.inputs.sampleCheckbox.ref} />
         <input ref={form.inputs.sampleNumeric.ref} disabled />
 
-        {isToggled && <input ref={form.inputs.sampleInput2.ref} />}
+        {/* {isToggled && <input ref={form.inputs.sampleInput2.ref} />} */}
+        {sampleCheckboxInputValue && <input ref={form.inputs.sampleInput2.ref} />}
         {/* <input ref={form.inputs.sampleInput2.ref} /> */}
 
         <button>submit yo</button>
