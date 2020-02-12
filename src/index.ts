@@ -1,4 +1,1 @@
-export * from "./ez-form";
-export * from "./utils";
-export * from "./validators";
-export * from "./react-ez-form";
+export const aaa = 123333;
