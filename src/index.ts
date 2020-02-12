@@ -1,1 +1,2 @@
-export const aaa = 123333;
+export * from "./form";
+export * from "./shared";
